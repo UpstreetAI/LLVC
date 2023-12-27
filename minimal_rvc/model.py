@@ -265,7 +265,8 @@ def load_embedder(emb_file: str, emb_name: str):
 
 def get_vc_model(model_name: str):
     model_path = os.path.join(MODELS_DIR, "rvc", model_name)
-    weight = torch.load(model_path, map_location="cpu")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    weight = torch.load(model_path, map_location=device)
     return VoiceConvertModel(model_name, weight)
 
 
