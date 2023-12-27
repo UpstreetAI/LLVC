@@ -329,12 +329,12 @@ def main():
         print('[INFER_FOLDER] Flattening LibriSpeech datasets')
         flatten_LibriSpeech(root_path=train_set_path,
                             flattened_path=out_path/'train-flatten',
-                            overwrite_flattened=False,
+                            overwrite_flattened=True,
                             copy_dataset=True)
 
         flatten_LibriSpeech(root_path=dev_set_path,
                             flattened_path=out_path/'dev-flatten',
-                            overwrite_flattened=False,
+                            overwrite_flattened=True,
                             copy_dataset=True)
 
         train_set_path = out_path/'train-flatten'
