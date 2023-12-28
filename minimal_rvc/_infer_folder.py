@@ -164,8 +164,9 @@ def convert_folder(root_path: Path | str,
         FileNotFoundError: If root_path does not exist
         ValueError: If root_path is a file
     """
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     model = VoiceConvertModel(
-        model_name, torch.load(model_path, map_location="cpu"))
+        model_name, torch.load(model_path, map_location=device))
 
     root_path = Path(root_path)
 
