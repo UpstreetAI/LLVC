@@ -220,6 +220,88 @@ class VoiceConvertModel:
         if os.path.exists(speaker_index_path):
             return speaker_index_path
         return os.path.join(MODELS_DIR, "rvc", f"{basename}.index")
+    def single_custom(
+        self,
+        sid: int,
+        input_audio: np.ndarray,
+        embedder_model_name: str,
+        embedding_output_layer: str,
+        f0_up_key: int,
+        f0_file: str,
+        f0_method: str,
+        auto_load_index: bool,
+        faiss_index_file: str,
+        index_rate: float,
+        output_dir: str = AUDIO_OUT_DIR,
+        f0_relative: bool = False,
+    ):
+        if not input_audio:
+            raise Exception("You need to set Source Audio")
+        f0_up_key = int(f0_up_key)
+        audio = input_audio
+        
+        if embedder_model_name == "auto":
+            embedder_model_name = (
+                self.state_dict["embedder_name"]
+                if "embedder_name" in self.state_dict
+                else "hubert_base"
+            )
+            if embedder_model_name.endswith("768"):
+                embedder_model_name = embedder_model_name[:-3]
+
+        if embedder_model_name == "hubert_base":
+            embedder_model_name = "contentvec"
+
+        if not embedder_model_name in EMBEDDINGS_LIST.keys():
+            raise Exception(f"Not supported embedder: {embedder_model_name}")
+
+        if (
+            embedder_model == None
+            or loaded_embedder_model != EMBEDDINGS_LIST[embedder_model_name][1]
+        ):
+            print(f"load {embedder_model_name} embedder")
+            embedder_filename, embedder_name, load_from = get_embedder(
+                embedder_model_name
+            )
+            load_embedder(embedder_filename, embedder_name)
+
+        if embedding_output_layer == "auto":
+            embedding_output_layer = (
+                self.state_dict["embedding_output_layer"]
+                if "embedding_output_layer" in self.state_dict
+                else 12
+            )
+        else:
+            embedding_output_layer = int(embedding_output_layer)
+
+        f0 = self.state_dict.get("f0", 1)
+
+        if not faiss_index_file and auto_load_index:
+            faiss_index_file = self.get_index_path(sid)
+
+        audio_opt = self.vc(
+            embedder_model,
+            embedding_output_layer,
+            self.net_g,
+            sid,
+            audio,
+            f0_up_key,
+            f0_method,
+            faiss_index_file,
+            index_rate,
+            f0,
+            f0_relative,
+            f0_file=f0_file,
+        )
+
+        audio = AudioSegment(
+            audio_opt,
+            frame_rate=self.tgt_sr,
+            sample_width=2,
+            channels=1,
+        )
+        return audio
+
 
 
 MODELS_DIR = opts.models_dir or os.path.join(ROOT_DIR, "llvc_models", "models")
