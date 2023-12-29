@@ -211,21 +211,10 @@ class VoiceConvertModel:
         # )
         # return audio_opt
 
-    def get_index_path(self, speaker_id: int):
-        basename = os.path.splitext(self.model_name)[0]
-        speaker_index_path = os.path.join(
-            MODELS_DIR,
-            "rvc",
-            f"{basename}_index",
-            f"{basename}.{speaker_id}.index",
-        )
-        if os.path.exists(speaker_index_path):
-            return speaker_index_path
-        return os.path.join(MODELS_DIR, "rvc", f"{basename}.index")
     def single_custom(
         self,
         sid: int,
-        input_audio: np.ndarray,
+        audio,
         embedder_model_name: str,
         embedding_output_layer: str,
         f0_up_key: int,
@@ -237,10 +226,8 @@ class VoiceConvertModel:
         output_dir: str = AUDIO_OUT_DIR,
         f0_relative: bool = False,
     ):
-        if not input_audio:
-            raise Exception("You need to set Source Audio")
+        
         f0_up_key = int(f0_up_key)
-        audio = input_audio
         
         if embedder_model_name == "auto":
             embedder_model_name = (
@@ -304,7 +291,17 @@ class VoiceConvertModel:
         )
         return audio
 
-
+    def get_index_path(self, speaker_id: int):
+        basename = os.path.splitext(self.model_name)[0]
+        speaker_index_path = os.path.join(
+            MODELS_DIR,
+            "rvc",
+            f"{basename}_index",
+            f"{basename}.{speaker_id}.index",
+        )
+        if os.path.exists(speaker_index_path):
+            return speaker_index_path
+        return os.path.join(MODELS_DIR, "rvc", f"{basename}.index")
 
 MODELS_DIR = opts.models_dir or os.path.join(ROOT_DIR, "llvc_models", "models")
 vc_model: Optional[VoiceConvertModel] = None
