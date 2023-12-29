@@ -9,6 +9,7 @@ import re
 from typing import *
 
 import torch
+import numpy as np
 from fairseq import checkpoint_utils
 from fairseq.models.hubert.hubert import HubertModel
 from pydub import AudioSegment
@@ -19,6 +20,7 @@ from .pipeline import VocalConvertPipeline
 from .cmd_opts import opts
 from .shared import ROOT_DIR, device, is_half
 from .utils import load_audio
+
 
 AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
