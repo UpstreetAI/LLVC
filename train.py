@@ -335,59 +335,59 @@ def training_runner(
                     )
 
                 # don't worry about caching val dataset for now
-                for loader in [dev_loader, val_loader]:
-                    if loader == dev_loader:
-                        loader_name = "dev"
-                    else:
-                        loader_name = "val"
-                    v_data = enumerate(loader)
-                    logging.info(f"Validating on {loader_name} dataset...")
-                    v_loss_mel_avg = utils.RunningAvg()
-                    v_loss_fairseq_avg = utils.RunningAvg()
-                    v_mcd_avg = utils.RunningAvg()
+                # for loader in [dev_loader, val_loader]:
+                #     if loader == dev_loader:
+                #         loader_name = "dev"
+                #     else:
+                #         loader_name = "val"
+                #     v_data = enumerate(loader)
+                #     logging.info(f"Validating on {loader_name} dataset...")
+                #     v_loss_mel_avg = utils.RunningAvg()
+                #     v_loss_fairseq_avg = utils.RunningAvg()
+                #     v_mcd_avg = utils.RunningAvg()
 
-                    with torch.no_grad():
-                        for v_batch_idx, v_batch in tqdm(v_data, total=len(loader)):
-                            v_output, v_gt, og = net_g_step(
-                                v_batch, net_g, device, config['fp16_run'])
+                #     with torch.no_grad():
+                #         for v_batch_idx, v_batch in tqdm(v_data, total=len(loader)):
+                #             v_output, v_gt, og = net_g_step(
+                #                 v_batch, net_g, device, config['fp16_run'])
 
-                        if config['aux_mel']['c'] > 0:
-                            v_loss_mel = utils.aux_mel_loss(
-                                output, gt, config) * config['aux_mel']['c']
-                            v_loss_mel_avg.update(v_loss_mel)
-                        if fairseq_model is not None:
-                            with autocast(enabled=config['fp16_run']):
-                                v_loss_fairseq = utils.fairseq_loss(
-                                    output, gt, fairseq_model) * config['aux_fairseq']['c']
-                                v_loss_fairseq_avg.update(v_loss_fairseq)
-                        v_mcd = utils.mcd(
-                            v_output, v_gt, config['data']['sr'])
-                        v_mcd_avg.update(v_mcd)
+                #         if config['aux_mel']['c'] > 0:
+                #             v_loss_mel = utils.aux_mel_loss(
+                #                 output, gt, config) * config['aux_mel']['c']
+                #             v_loss_mel_avg.update(v_loss_mel)
+                #         if fairseq_model is not None:
+                #             with autocast(enabled=config['fp16_run']):
+                #                 v_loss_fairseq = utils.fairseq_loss(
+                #                     output, gt, fairseq_model) * config['aux_fairseq']['c']
+                #                 v_loss_fairseq_avg.update(v_loss_fairseq)
+                #         v_mcd = utils.mcd(
+                #             v_output, v_gt, config['data']['sr'])
+                #         v_mcd_avg.update(v_mcd)
 
-                    if config['aux_mel']['c'] > 0:
-                        scalar_dict.update(
-                            {f"{loader_name}_metrics/mel": v_loss_mel_avg(),
-                             f"{loader_name}_metrics/mcd": v_mcd_avg()}
-                        )
-                        v_loss_mel_avg.reset()
-                    if fairseq_model is not None:
-                        scalar_dict.update(
-                            {f"{loader_name}_metrics/fairseq": v_loss_fairseq_avg()}
-                        )
-                        v_loss_fairseq_avg.reset()
-                    v_mcd_avg.reset()
-                    audio_dict.update(
-                        {f"{loader_name}_audio/gt_{i}": v_gt[i].data.cpu().numpy()
-                         for i in range(min(3, v_gt.shape[0]))}
-                    )
-                    audio_dict.update(
-                        {f"{loader_name}_audio/in_{i}": og[i].data.cpu().numpy()
-                         for i in range(min(3, og.shape[0]))}
-                    )
-                    audio_dict.update(
-                        {f"{loader_name}_audio/pred_{i}": v_output[i].data.cpu().numpy()
-                         for i in range(min(3, v_output.shape[0]))}
-                    )
+                #     if config['aux_mel']['c'] > 0:
+                #         scalar_dict.update(
+                #             {f"{loader_name}_metrics/mel": v_loss_mel_avg(),
+                #              f"{loader_name}_metrics/mcd": v_mcd_avg()}
+                #         )
+                #         v_loss_mel_avg.reset()
+                #     if fairseq_model is not None:
+                #         scalar_dict.update(
+                #             {f"{loader_name}_metrics/fairseq": v_loss_fairseq_avg()}
+                #         )
+                #         v_loss_fairseq_avg.reset()
+                #     v_mcd_avg.reset()
+                #     audio_dict.update(
+                #         {f"{loader_name}_audio/gt_{i}": v_gt[i].data.cpu().numpy()
+                #          for i in range(min(3, v_gt.shape[0]))}
+                #     )
+                #     audio_dict.update(
+                #         {f"{loader_name}_audio/in_{i}": og[i].data.cpu().numpy()
+                #          for i in range(min(3, og.shape[0]))}
+                #     )
+                #     audio_dict.update(
+                #         {f"{loader_name}_audio/pred_{i}": v_output[i].data.cpu().numpy()
+                #          for i in range(min(3, v_output.shape[0]))}
+                #     )
 
                 net_g.train()
 
