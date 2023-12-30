@@ -165,7 +165,7 @@ def training_runner(
     cache = []
     loss_mel_avg = utils.RunningAvg()
     loss_fairseq_avg = utils.RunningAvg()
-    for epoch in range(epoch, 10000):
+    for epoch in range(epoch, 53):
         # train_loader.batch_sampler.set_epoch(epoch)
 
         net_g.train()
