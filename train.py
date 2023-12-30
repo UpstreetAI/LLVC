@@ -86,7 +86,7 @@ def training_runner(
 
     net_g = Net(**config['model_params'])
     if pretrained_generator_path is not None:
-        net_g.load_state_dict(torch.load(checkpoint_path, map_location="cuda")['model'])
+        net_g.load_state_dict(torch.load(pretrained_generator_path, map_location="cuda")['model'])
     logging.info(f"Model size: {utils.model_size(net_g)}M params")
 
     if is_multi_process:
