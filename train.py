@@ -42,6 +42,7 @@ def training_runner(
     world_size,
     config,
     training_dir,
+    pretrained_generator_path = None
 ):
     log_dir = os.path.join(training_dir, "logs")
     checkpoint_dir = os.path.join(training_dir, "checkpoints")
@@ -84,6 +85,8 @@ def training_runner(
                                              batch_size=config['eval_batch_size'])
 
     net_g = Net(**config['model_params'])
+    if pretrained_generator_path is not None:
+        net_g.load_state_dict(torch.load(checkpoint_path, map_location="cuda")['model'])
     logging.info(f"Model size: {utils.model_size(net_g)}M params")
 
     if is_multi_process:
@@ -435,7 +438,8 @@ def training_runner(
 def train_model(
     gpus,
     config,
-    training_dir
+    training_dir,
+    pretrained_generator_path
 ):
     deterministic = torch.backends.cudnn.deterministic
     benchmark = torch.backends.cudnn.benchmark
@@ -456,7 +460,8 @@ def train_model(
         args=(
             len(gpus),
             config,
-            training_dir
+            training_dir,
+            pretrained_generator_path
         )
     )
 
@@ -471,6 +476,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dir', "-d", type=str,
                         help="Path to save checkpoints and logs.")
+    parser.add_argument('--pretrained_generator_path', "-p", type=str, default = None,
+                        help="Path to pretrained generator provided by KoeAI")
+    
     args = parser.parse_args()
     with open(os.path.join(args.dir, "config.json")) as f:
         config = json.load(f)
@@ -489,7 +497,7 @@ def main():
             if not os.path.exists(checkpoint_folder):
                 os.makedirs(checkpoint_folder)
             os.system(f"wget {checkpoint_url} -P {checkpoint_folder}")
-    train_model(gpus, config, args.dir)
+    train_model(gpus, config, args.dir, args.pretrained_generator_path)
 
 
 if __name__ == "__main__":
