@@ -1,0 +1,17 @@
+version: '3'
+services:
+  llvc-server:
+    image: llvc
+    ports:
+      - 8000:8000
+    volumes:
+      - /home/ubuntu/LLVC/server.py:/src/server.py
+      - /home/ubuntu/LLVC/public:/src/public
+      - /home/ubuntu/LLVC/inference.py:/src/inference.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
