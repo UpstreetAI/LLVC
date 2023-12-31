@@ -3,7 +3,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import numpy as np
-from inference import infer, load_opus_audio
+from inference import infer, load_opus_audio, writeFloat32toFile
 from typing import List, Dict
 import json
 import torchaudio
@@ -52,6 +52,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, friend_id: str)
         while True:
             # Receive voice data from one user and broadcast to the other user
             data = await websocket.receive_bytes()
+        
+            writeFloat32toFile(data, 'input')
+
             print('Recieved data in bytes')
             audio_np = np.frombuffer(data, dtype=np.float32)
             # audio_np = audio_np.astype(np.float32) / 0x7FFF 

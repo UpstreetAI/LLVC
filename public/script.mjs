@@ -7,7 +7,10 @@ if (!queryParams || queryParams.size < 2) {
 
 const userId = queryParams.get('userId');
 const friendId = queryParams.get('friendId');
-const kSampleRate = 16000;
+const kSampleRate = 44100;
+const bitrate = 60000;
+const frameSize = 20;
+const voiceOptimization = true;
 
 let socket = new WebSocket(`wss://stream.upstreet.ai/ws/${userId}/${friendId}`);
 socket.binaryType = "arraybuffer";
@@ -21,6 +24,15 @@ socket.onmessage = function (event) {
     const float32Array = new Float32Array(event.data);
     play(float32Array, float32Array.length)
 };
+
+function floatTo16Bit(inputArray){
+    const output = new Int16Array(inputArray.length);
+    for (let i = 0; i < inputArray.length; i++){
+      const s = Math.max(-1, Math.min(1, inputArray[i]));
+      output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return output;
+}
 
 function play(data, length, sampleRate) {
 
@@ -75,7 +87,7 @@ async function startVoiceChat(userId) {
     if (window.mediaRecorder) {
         return;
     }
-    const enc = await encoderPromise(1, 16000);
+    const enc = await encoderPromise(1, kSampleRate, bitrate, frameSize, voiceOptimization);
 
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
@@ -87,43 +99,38 @@ async function startVoiceChat(userId) {
 
                 if (event.data.size > 0) {
                     let reader = new FileReader();
-                    reader.onload = function () {
+                    reader.onload = async () => {
                         const arrayBuffer = reader.result;
                         console.log('arrayBuffer', arrayBuffer);
 
-                        try {
+                        const audioContext = new AudioContext({
+                            sampleRate: kSampleRate,
+                            channelCount: 1,
+                            echoCancellation: false,
+                            autoGainControl: true,
+                            noiseSuppression: true,
+                        });
 
-                            const audioContext = new AudioContext({
-                                sampleRate: kSampleRate,
-                                channelCount: 1,
-                                echoCancellation: false,
-                                autoGainControl: true,
-                                noiseSuppression: true,
-                            });
+                        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-                            audioContext.decodeAudioData(arrayBuffer, async (audioBuffer) => {
-                                // Do something with audioBuffer
-                                console.log('audioBuffer', audioBuffer)
+                        var offlineContext = new OfflineAudioContext(audioBuffer.numberOfChannels, audioBuffer.length, audioBuffer.sampleRate);
+                        var source = offlineContext.createBufferSource();
+                        source.buffer = audioBuffer;
+                        source.connect(offlineContext.destination);
+                        source.start();
+                        const renderedBuffer = await offlineContext.startRendering();
+                        const audio = renderedBuffer.getChannelData(0);
 
-                                var offlineContext = new OfflineAudioContext(audioBuffer.numberOfChannels, audioBuffer.length, audioBuffer.sampleRate);
-                                var source = offlineContext.createBufferSource();
-                                source.buffer = audioBuffer;
-                                source.connect(offlineContext.destination);
-                                source.start();
-                                const renderedBuffer = await offlineContext.startRendering();
-                                const audio = renderedBuffer.getChannelData(0);
+                        console.log('audio pcm', audio);
 
-                                console.log('renderedBuffer', renderedBuffer);
+                        const fl16 = floatTo16Bit(audio);
+                        enc.input(fl16)
 
-                                //return play(audio, audio.length, renderedBuffer.sampleRate)
+                        const out = enc.output();
 
-                                return socket.send(audio);
-                            });
-                        } catch (e) {
-                            //ignore
-                        }
+                        console.log('OPUS data', out);
 
-
+                        return socket.send(audio);
                     };
 
                     reader.readAsArrayBuffer(event.data);
