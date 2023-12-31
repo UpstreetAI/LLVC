@@ -405,8 +405,8 @@ def training_runner(
                 if global_step % config['checkpoint_interval'] == 0:
                     g_checkpoint = os.path.join(
                         checkpoint_dir, f"G_{global_step}.pth")
-                    d_checkpoint = os.path.join(
-                        checkpoint_dir, f"D_{global_step}.pth")
+                    # d_checkpoint = os.path.join(
+                    #     checkpoint_dir, f"D_{global_step}.pth")
                     utils.save_state(
                         net_g,
                         optim_g,
@@ -415,16 +415,16 @@ def training_runner(
                         global_step,
                         g_checkpoint
                     )
-                    utils.save_state(
-                        net_d,
-                        optim_d,
-                        lr,
-                        epoch,
-                        global_step,
-                        d_checkpoint
-                    )
+                    # utils.save_state(
+                    #     net_d,
+                    #     optim_d,
+                    #     lr,
+                    #     epoch,
+                    #     global_step,
+                    #     d_checkpoint
+                    # )
                     logging.info(
-                        f"Saved checkpoints to {g_checkpoint} and {d_checkpoint}")
+                        f"Saved Generator to {g_checkpoint}")
                     progress_bar.reset()
                 torch.cuda.empty_cache()
 
