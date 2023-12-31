@@ -11,7 +11,7 @@ import torch
 import uvicorn
 import pickle as pkl
 import wave
-
+import uuid
 
 app = FastAPI()
 
@@ -54,10 +54,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, friend_id: str)
             # Receive voice data from one user and broadcast to the other user
             data = await websocket.receive_bytes()
 
-            with open('/src/debug/websocket_audio.pkl', 'wb') as file:
-                pkl.dump(data, file) 
+            # with open(f'/src/debug/pkl_{str(uuid.uuid4())}.pkl', 'wb') as file:
+            #     pkl.dump(data, file) 
             
-            output_audio = convert_webm_to_fl32(data)
+            data = convert_webm_to_fl32(data)
 
             # print('output_audio',output_audio)
 
@@ -66,14 +66,14 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, friend_id: str)
 
             # print(f'---log---: out type: {type(data)}')
 
-            output_audio = np.frombuffer(output_audio, np.float32)
+            data = np.frombuffer(data, np.float32)
             # # data = data.astype(np.float32) / 0x7FFF 
 
-            print('Input type is', type(output_audio))
+            print('Input type is', type(data))
 
             print('About to infer data')
 
-            out = infer(output_audio)
+            out = infer(data)
             print('about to dispatch the data')
 
 

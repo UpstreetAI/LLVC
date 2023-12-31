@@ -87,7 +87,7 @@ def convert_webm_to_fl32(webm_audio_buffer):
     # Input format as WebM and output format as FL32
     process = (
         ffmpeg
-        .input('pipe:', format='webm')
+        .input('pipe:', format="f32le")
         .output('pipe:', format="f32le", acodec="pcm_f32le", ac=1, ar=16000)  # FL32 format
         .run_async(pipe_stdin=True, pipe_stdout=True)
     )
@@ -114,13 +114,13 @@ def writeFloat32toFile(buff, path):
 def infer(audio_buffer):
     a = time.time()
 
-    fname = f'/src/debug/{str(uuid.uuid4())}.wav'
+    # fname = f'/src/debug/{str(uuid.uuid4())}.wav'
 
-    ##fname = '/src/debug/input.wav'
+    # ##fname = '/src/debug/input.wav'
 
-    #writeFloat32toFile(audio_buffer, '/src/debug/input.wav')    
+    writeFloat32toFile(audio_buffer, '/src/debug/input.wav')    
 
-    writeFloat32toFile(audio_buffer, fname)
+    # writeFloat32toFile(audio_buffer, fname)
 
     # audio_buffer = load_audio(fname, 16000)
 
