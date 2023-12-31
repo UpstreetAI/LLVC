@@ -3,13 +3,14 @@ from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import numpy as np
-from inference import infer, load_opus_audio, writeFloat32toFile
+from inference import infer, load_opus_audio, writeFloat32toFile, convert_webm_to_fl32
 from typing import List, Dict
 import json
 import torchaudio
 import torch
 import uvicorn
-
+import pickle as pkl
+import wave
 
 
 app = FastAPI()
@@ -52,14 +53,30 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, friend_id: str)
         while True:
             # Receive voice data from one user and broadcast to the other user
             data = await websocket.receive_bytes()
-        
-            writeFloat32toFile(data, 'input')
 
-            print('Recieved data in bytes')
-            audio_np = np.frombuffer(data, dtype=np.float32)
-            # audio_np = audio_np.astype(np.float32) / 0x7FFF 
-            out = infer(audio_np)
+            with open('/src/debug/websocket_audio.pkl', 'wb') as file:
+                pkl.dump(data, file) 
+            
+            output_audio = convert_webm_to_fl32(data)
+
+            # print('output_audio',output_audio)
+
+            #writeFloat32toFile(output_audio, '/src/debug/input.wav')
+            # print('Recieved data in bytes')
+
+            # print(f'---log---: out type: {type(data)}')
+
+            output_audio = np.frombuffer(output_audio, np.float32)
+            # # data = data.astype(np.float32) / 0x7FFF 
+
+            print('Input type is', type(output_audio))
+
+            print('About to infer data')
+
+            out = infer(output_audio)
             print('about to dispatch the data')
+
+
             if friend_id in active_connections:
                 await active_connections[friend_id].send_bytes(out)
     except Exception as e:

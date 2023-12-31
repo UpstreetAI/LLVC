@@ -17,6 +17,11 @@ import multiprocessing
 from opuslib import Decoder, Encoder
 import time 
 from scipy.io import wavfile
+import ffmpeg
+import io
+import struct
+import uuid
+import os
 
 multiprocessing.set_start_method("spawn", force=True)
 
@@ -36,12 +41,67 @@ def load_opus_audio(packet):
    return Decoder.decode(packet, 16000)
 
 
+# def load_audio(buffer, sr):
+#     try:
+#         input_stream = io.BytesIO(buffer.tobytes())
+#         ffmpeg_command = (
+#             ffmpeg.input('pipe:', threads=5)
+#             .output('pipe:', format="f32le", acodec="pcm_f32le", ac=1, ar=sr)
+#             .run_async(pipe_stdin=True, pipe_stdout=True)
+#         )
+
+#         print(input_stream)
+
+#         out, _ = ffmpeg_command.communicate(input=input_stream.read())
+#         print(f'---log---: out type: {type(out)}')
+#     except Exception as e:
+#         raise RuntimeError(f"Failed to load audio: {e}")
+
+#     return np.frombuffer(out, np.float32).flatten()
+
+def load_audio(file: str, sr):
+    try:
+        # https://github.com/openai/whisper/blob/main/whisper/audio.py#L26
+        # This launches a subprocess to decode audio while down-mixing and resampling as necessary.
+        # Requires the ffmpeg CLI and `ffmpeg-python` package to be installed.
+        file = (
+            file.strip(" ").strip('"').strip("\n").strip('"').strip(" ")
+        )  # Prevent small white copy path head and tail with spaces and " and return
+        out, _ = (
+            ffmpeg.input(file, threads=0)
+            .output("-", format="f32le", acodec="pcm_f32le", ac=1, ar=sr)
+            .run(cmd=["ffmpeg", "-nostdin"], capture_stdout=True, capture_stderr=True)
+        )
+        print(f'---log---: out type: {type(out)}')
+    except Exception as e:
+        raise RuntimeError(f"Failed to load audio: {e}")
+
+    #os.remove(file)
+
+    return np.frombuffer(out, np.float32).flatten()
+
+def convert_webm_to_fl32(webm_audio_buffer):
+    # Input the WebM audio buffer as bytes
+    input_data = io.BytesIO(webm_audio_buffer)
+
+    # Input format as WebM and output format as FL32
+    process = (
+        ffmpeg
+        .input('pipe:', format='webm')
+        .output('pipe:', format="f32le", acodec="pcm_f32le", ac=1, ar=16000)  # FL32 format
+        .run_async(pipe_stdin=True, pipe_stdout=True)
+    )
+
+    output_audio, _ = process.communicate(input=input_data.read())
+
+    return np.frombuffer(output_audio, np.float32).flatten()
+
 def writeFloat32toFile(buff, path):
     ######## DEBUGGING
     sample_rate = 44100  # You can change this to your desired sample rate
-    output_file = f"/src/debug/{path}.wav"
+    output_file = path
 
-    # Convert audio_data_for_js back to a NumPy array of float32
+    # # Convert audio_data_for_js back to a NumPy array of float32
     audio_array = np.frombuffer(buff, dtype=np.float32)
 
     # Scale the float32 array to int16
@@ -53,6 +113,16 @@ def writeFloat32toFile(buff, path):
 
 def infer(audio_buffer):
     a = time.time()
+
+    fname = f'/src/debug/{str(uuid.uuid4())}.wav'
+
+    ##fname = '/src/debug/input.wav'
+
+    #writeFloat32toFile(audio_buffer, '/src/debug/input.wav')    
+
+    writeFloat32toFile(audio_buffer, fname)
+
+    # audio_buffer = load_audio(fname, 16000)
 
     audio = model.single_custom(
         sid=1,
@@ -94,9 +164,5 @@ def infer(audio_buffer):
     # For instance, to get the audio data in a format compatible with JavaScript's Float32Array:
     audio_data_for_js = audio_array.flatten().tobytes()
 
-
-
-    writeFloat32toFile(audio_data_for_js, 'output')
-
-    
+    writeFloat32toFile(audio_data_for_js, '/src/debug/output.wav')    
     return audio_data_for_js

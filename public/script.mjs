@@ -1,4 +1,5 @@
 import libopus from './libopusjs/libopus.wasm.js';
+import { Queue } from './queue.js';
 
 const queryParams = new URLSearchParams(window.location.search);
 if (!queryParams || queryParams.size < 2) {
@@ -12,6 +13,15 @@ const bitrate = 60000;
 const frameSize = 20;
 const voiceOptimization = true;
 
+const audioContext = new AudioContext({
+    sampleRate: kSampleRate,
+    channelCount: 1,
+    echoCancellation: false,
+    autoGainControl: true,
+    noiseSuppression: true,
+});
+
+
 let socket = new WebSocket(`wss://stream.upstreet.ai/ws/${userId}/${friendId}`);
 socket.binaryType = "arraybuffer";
 
@@ -19,61 +29,72 @@ socket.onopen = function (event) {
     console.log("WebSocket connected");
 };
 
+const audioQueue = new Queue();
+let playBackInProgress = false;
+
 socket.onmessage = function (event) {
     console.log('recieved from socket', event.data);
     const float32Array = new Float32Array(event.data);
-    play(float32Array, float32Array.length)
+    audioQueue.enqueue(float32Array);
+    console.log('Enqueued data', audioQueue.size);
+
+    play();
 };
 
-function floatTo16Bit(inputArray){
-    const output = new Int16Array(inputArray.length);
-    for (let i = 0; i < inputArray.length; i++){
-      const s = Math.max(-1, Math.min(1, inputArray[i]));
-      output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+
+function play(sampleRate) {
+    console.log('Queue playback began');
+    if(playBackInProgress){
+        return;
     }
-    return output;
-}
+    
+    while(!audioQueue.isEmpty()){
+        playBackInProgress = true;
+        const data =  audioQueue.dequeue();
+        const length = data.length;
 
-function play(data, length, sampleRate) {
+        console.log('Dequed', data);
+        console.log('About to play', data, length, sampleRate);
 
-    console.log('About to play', data, length, sampleRate);
+        var channels = 1
+        var sampleRate = sampleRate || kSampleRate
+        var frames = length
 
-    var context = new window.AudioContext()
+        var buffer = audioContext.createBuffer(channels, frames, sampleRate)
 
-    var channels = 1
-    var sampleRate = sampleRate || kSampleRate
-    var frames = length
+        console.log('Setting data to buffer');
+        // `data` comes from your Websocket, first convert it to Float32Array
+        buffer.getChannelData(0).set(data)
 
-    var buffer = context.createBuffer(channels, frames, sampleRate)
+        // buffer.getChannelData(0).buffer = data.buffer;
 
-    console.log('Setting data to buffer');
-    // `data` comes from your Websocket, first convert it to Float32Array
-    buffer.getChannelData(0).set(data)
+        console.log('source.buffer = buffer');
 
-    // buffer.getChannelData(0).buffer = data.buffer;
+        var source = audioContext.createBufferSource()
+        source.buffer = buffer;
 
-    console.log('source.buffer = buffer');
+        console.log('Connecting source');
+        // Then output to speaker for example
+        source.connect(audioContext.destination)
 
-    var source = context.createBufferSource()
-    source.buffer = buffer;
+        console.log('Setting loop to false');
 
-    console.log('Connecting source');
-    // Then output to speaker for example
-    source.connect(context.destination)
+        source.loop = false;
 
-    console.log('Setting loop to false');
+        source.start(0);
 
-    source.loop = false;
-
-    source.start(0);
-
-    console.log('play started');
+        console.log('play started');
+    }
 }
 
 function stopVoiceChat(userId) {
     if (window.mediaRecorder) {
         window.mediaRecorder.stop();
         window.mediaRecorder = null;
+    }
+
+    if(window.microphone){
+        window.microphone.disconnect()
     }
 }
 
@@ -93,52 +114,8 @@ async function startVoiceChat(userId) {
         .then(stream => {
             const mediaRecorder = new MediaRecorder(stream);
             mediaRecorder.ondataavailable = async event => {
-
-                console.log(Date.now(), '======> media recorder data available');
-
-
-                if (event.data.size > 0) {
-                    let reader = new FileReader();
-                    reader.onload = async () => {
-                        const arrayBuffer = reader.result;
-                        console.log('arrayBuffer', arrayBuffer);
-
-                        const audioContext = new AudioContext({
-                            sampleRate: kSampleRate,
-                            channelCount: 1,
-                            echoCancellation: false,
-                            autoGainControl: true,
-                            noiseSuppression: true,
-                        });
-
-                        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-                        var offlineContext = new OfflineAudioContext(audioBuffer.numberOfChannels, audioBuffer.length, audioBuffer.sampleRate);
-                        var source = offlineContext.createBufferSource();
-                        source.buffer = audioBuffer;
-                        source.connect(offlineContext.destination);
-                        source.start();
-                        const renderedBuffer = await offlineContext.startRendering();
-                        const audio = renderedBuffer.getChannelData(0);
-
-                        console.log('audio pcm', audio);
-
-                        const fl16 = floatTo16Bit(audio);
-                        enc.input(fl16)
-
-                        const out = enc.output();
-
-                        console.log('OPUS data', out);
-
-                        return socket.send(audio);
-                    };
-
-                    reader.readAsArrayBuffer(event.data);
-
-                    // console.log(enc);
-                    // socket.send(floatArray);
-
-                }
+                console.log(Date.now(), '======> media recorder data available', event);
+                return socket.send(event.data);
             };
             mediaRecorder.start(1000);
             window.mediaRecorder = mediaRecorder;
@@ -148,6 +125,7 @@ async function startVoiceChat(userId) {
         });
 }
 
-
 document.getElementById('startVoiceChat').onclick = startVoiceChat;
 document.getElementById('stopVoiceChat').onclick = stopVoiceChat;
+
+play();
