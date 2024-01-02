@@ -1,5 +1,4 @@
 import libopus from './libopusjs/libopus.wasm.js';
-import { Queue } from './queue.js';
 
 const queryParams = new URLSearchParams(window.location.search);
 if (!queryParams || queryParams.size < 2) {
@@ -20,46 +19,40 @@ let audioContextPlay = new AudioContext();
 let source = null;
 let audioBufferQueue = [];
 
-let socket = new WebSocket(`wss://stream.upstreet.ai/ws/${userId}/${friendId}`);
-socket.binaryType = "arraybuffer";
+let socket;
 
-socket.onopen = function (event) {
-    console.log("WebSocket connected");
-};
+function registerSocket(model = 'model'){
 
-const audioQueue = new Queue();
-let playBackInProgress = false;
+    socket = new WebSocket(`wss://stream.upstreet.ai/ws/${userId}/${friendId}/${model}`);
+    socket.binaryType = "arraybuffer";
 
-socket.onmessage = function (event) {
-    // console.log('recieved from socket', event.data);
-    const float32Array = new Float32Array(event.data);
-    var channels = 1
-    var sampleRate = sampleRate || kSampleRate
-    var frames = float32Array.length
+    socket.onopen = function (event) {
+        console.log("WebSocket connected");
+    };
 
-    var buffer = audioContextPlay.createBuffer(channels, frames, sampleRate)
+    socket.onmessage = function (event) {
+        // console.log('recieved from socket', event.data);
+        const float32Array = new Float32Array(event.data);
+        var channels = 1
+        var sampleRate = sampleRate || kSampleRate
+        var frames = float32Array.length
 
-    console.log('Setting data to buffer');
-    // `data` comes from your Websocket, first convert it to Float32Array
-    buffer.getChannelData(0).set(float32Array)
-    // audioQueue.enqueue(float32Array);
-    // console.log('Enqueued data', audioQueue.size);
-    console.log(buffer)
-    //handleIncomingPCMData(event.data);
-    audioBufferQueue.push(buffer);
-    if (!source) {
-        playBufferedAudio();
-    }
-    //play();
-};
+        var buffer = audioContextPlay.createBuffer(channels, frames, sampleRate)
 
-function handleIncomingPCMData(pcmData) {
-    audioContextPlay.decodeAudioData(pcmData.slice(0), buffer => {
+        console.log('Setting data to buffer');
+        // `data` comes from your Websocket, first convert it to Float32Array
+        buffer.getChannelData(0).set(float32Array)
+        // audioQueue.enqueue(float32Array);
+        // console.log('Enqueued data', audioQueue.size);
+        console.log(buffer)
+        //handleIncomingPCMData(event.data);
         audioBufferQueue.push(buffer);
         if (!source) {
             playBufferedAudio();
         }
-    }, error => console.error('Error decoding audio data', error));
+        //play();
+    };
+
 }
 
 // Function to play buffered audio
@@ -72,52 +65,6 @@ function playBufferedAudio() {
         source.start();
     } else {
         source = null;
-    }
-}
-
-
-function play(sampleRate) {
-    console.log('Queue playback began');
-    if(playBackInProgress){
-        return;
-    }
-    
-    while(!audioQueue.isEmpty()){
-        playBackInProgress = true;
-        const data =  audioQueue.dequeue();
-        const length = data.length;
-
-        console.log('Dequed', data);
-        console.log('About to play', data, length, sampleRate);
-
-        var channels = 1
-        var sampleRate = sampleRate || kSampleRate
-        var frames = length
-
-        var buffer = audioContext.createBuffer(channels, frames, sampleRate)
-
-        console.log('Setting data to buffer');
-        // `data` comes from your Websocket, first convert it to Float32Array
-        buffer.getChannelData(0).set(data)
-
-        // buffer.getChannelData(0).buffer = data.buffer;
-
-        console.log('source.buffer = buffer');
-
-        var source = audioContext.createBufferSource()
-        source.buffer = buffer;
-
-        console.log('Connecting source');
-        // Then output to speaker for example
-        source.connect(audioContext.destination)
-
-        console.log('Setting loop to false');
-
-        source.loop = false;
-
-        source.start(0);
-
-        console.log('play started');
     }
 }
 
@@ -192,4 +139,47 @@ async function processStream(stream) {
 document.getElementById('startVoiceChat').onclick = startVoiceChat;
 document.getElementById('stopVoiceChat').onclick = stopVoiceChat;
 
-play();
+setTimeout(()=>{
+    document.getElementById('modelSelect').addEventListener('change', function() {
+        var selectedOption = this.options[this.selectedIndex];
+        const model = selectedOption.value;
+        socket.close();
+        socket = null;
+        registerSocket(model);
+    });
+}, 500)
+
+
+document.getElementById('uploadForm').addEventListener('submit', function(event) {
+    event.preventDefault(); // Prevent the default form submission
+
+    var fileInput = document.getElementById('fileInput').files[0];
+    var fileName = document.getElementById('fileName').value;
+
+    if(!fileInput || !fileName){
+        alert('Missing Inputs');
+        return;
+    }    
+
+    var formData = new FormData();
+
+    formData.append('file', fileInput); // Append the file
+    formData.append('name', fileName); // Append the file
+
+    fetch(`/add-model/${fileName}`, { // Replace '/upload' with your actual upload URL
+        method: 'POST',
+        body: formData,
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert('Upload successful!');
+        window.location.reload();
+    })
+    .catch(error => {
+        alert('Something went wrong')
+        console.error('Error:', error);
+    });
+});
+
+
+registerSocket();

@@ -9,6 +9,7 @@ services:
       - /home/ubuntu/LLVC/public:/src/public
       - /home/ubuntu/LLVC/inference.py:/src/inference.py
       - /home/ubuntu/LLVC/debug:/src/debug
+      - /home/ubuntu/LLVC/models:/src/models
     deploy:
       resources:
         reservations:

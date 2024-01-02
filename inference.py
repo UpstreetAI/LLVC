@@ -22,6 +22,8 @@ import io
 import struct
 import uuid
 import os
+from os import listdir
+from os.path import isfile, join
 
 multiprocessing.set_start_method("spawn", force=True)
 
@@ -34,7 +36,22 @@ model_name = "matpat"  # Name to be added to output filenames
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = VoiceConvertModel(model_name, torch.load(model_path, map_location=device))
 
-print('Device is ', device)
+loaded_models = dict()
+
+def all_models():
+    return [f for f in listdir('/src/models') if isfile(join('/src/models', f))]
+
+def loadModel(model_id:str):
+    if(len(loaded_models) > 14):
+        for x in loaded_models:
+            if x != 'model':
+               model_unload = loaded_models.pop(x)
+               del model_unload
+               torch.cuda.empty_cache()
+               break
+    
+    loaded_models[model_id] = VoiceConvertModel(model_id, torch.load(f'/src/models/{model_id}.pth', map_location=device))
+    print('Model loaded', model)
 
 
 def load_opus_audio(packet):
@@ -81,6 +98,8 @@ def load_audio(file: str, sr):
     return np.frombuffer(out, np.float32).flatten()
 
 def convert_webm_to_fl32(webm_audio_buffer):
+    a = time.time()
+
     # Input the WebM audio buffer as bytes
     input_data = io.BytesIO(webm_audio_buffer)
 
@@ -93,6 +112,10 @@ def convert_webm_to_fl32(webm_audio_buffer):
     )
 
     output_audio, _ = process.communicate(input=input_data.read())
+
+    b = time.time()
+
+    print ('======= FFMPEG TIME', b - a)
 
     return np.frombuffer(output_audio, np.float32).flatten()
 
@@ -111,20 +134,14 @@ def writeFloat32toFile(buff, path):
     wavfile.write(output_file, sample_rate, audio_array)
     ########
 
-def infer(audio_buffer):
-    a = time.time()
+def infer(audio_buffer, model):
+    a = time.time()    
+    
+    if not(model in loaded_models):
+        print('Loading unloaded model', model)
+        loadModel(model)
 
-    # fname = f'/src/debug/{str(uuid.uuid4())}.wav'
-
-    # ##fname = '/src/debug/input.wav'
-
-    writeFloat32toFile(audio_buffer, '/src/debug/input.wav')    
-
-    # writeFloat32toFile(audio_buffer, fname)
-
-    # audio_buffer = load_audio(fname, 16000)
-
-    audio = model.single_custom(
+    audio = loaded_models[model].single_custom(
         sid=1,
         audio=audio_buffer,
         embedder_model_name="hubert_base",
@@ -141,7 +158,7 @@ def infer(audio_buffer):
 
     b = time.time()
 
-    print ('Inference took', b - a)
+    print ('======= VOICE CHANGER TIME', b - a)
 
     print('audio converted is', audio)
 
@@ -164,5 +181,21 @@ def infer(audio_buffer):
     # For instance, to get the audio data in a format compatible with JavaScript's Float32Array:
     audio_data_for_js = audio_array.flatten().tobytes()
 
-    writeFloat32toFile(audio_data_for_js, '/src/debug/output.wav')    
+    # writeFloat32toFile(audio_data_for_js, '/src/debug/output.wav')    
     return audio_data_for_js
+
+
+def baseInference(byte, model="model"):
+    a = time.time()
+    data = convert_webm_to_fl32(byte)
+    data = np.frombuffer(data, np.float32)
+
+    print('Input type is', type(data))
+
+    out = infer(data, model)
+    print('about to dispatch the data')
+    b = time.time()
+
+    print('Inference time is', b - a)
+
+    return out
