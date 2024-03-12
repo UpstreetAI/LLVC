@@ -1,4 +1,4 @@
-FROM cog-temp:v1
+FROM nvidia/cuda:11.8.0-base-ubuntu20.04
 WORKDIR /src
 RUN rm -rf /src/*
 ADD ./requirements.txt .
